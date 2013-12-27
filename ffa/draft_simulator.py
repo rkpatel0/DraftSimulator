@@ -43,45 +43,42 @@ class DraftSimulator:
     def __init__(self, playerInfo, teamsDraft):
 
         # Save Info Passed to Object
-        self.playerInfo = playerInfo;
-        self.teamsDraft = teamsDraft;
+        self.playerInfo     = playerInfo       # Master List of players
+        self.teamStrategy   = teamsDraft       
 
-        self.SetInstanceVariables()
-
-    def SetInstanceVariables(self):
-        print 'Creating Draft Simulator Class!';
-
-        # Set Constant Terms
-        self.DRAFTS_TO_RUN          = 100;
-        self.PRINT_DRAFT_RESULTS    = True;
-        self.PRINT_PLAYER_ANALYSIS  = True;
-        self.PRINT_PLOTS            = False;
-        self.LONG_STR               = '------------------------------------------------\n';
+        # Set Default Conditons
+        self.SetDraftDefault()
+        self.SetAnalsyisConditions()
+        self.SetConstants()
         
-        self.teamNames      = self.teamsDraft.index;
-        self.numOfTeams     = len(self.teamNames);
-        self.rounds         = sum(self.playerInfo.ix['spots']);
+    def SetDraftDefault(self):
+
+        self.DRAFTS_TO_RUN  = 1        
+        self.teamNames      = self.teamStrategy.index
+        self.numOfTeams     = len(self.teamNames)
+        self.rounds         = sum(self.playerInfo.ix['spots'])
+
+    def SetAnalsyisConditions(self):
         
-        # Static
-        self.SelectType     = 'max_points';
-        self.BreakTieType   = 'random';
-        self.teamCol        = ['pick', 'pos', 'pts', 'posRnk', 'id'];     # output format
-                                                                
+        self.PRINT_DRAFT_RESULTS    = True
+        self.PRINT_PLAYER_ANALYSIS  = True
+        self.PRINT_PLOTS            = False
+        
+    def SetConstants(self):
+        self.DF_TEAM_COLUMN     = ['pick', 'pos', 'pts', 'posRnk', 'id']
+        self.DF_DRAFTRES_COLUMN = ['RND', 'TEAM', 'ID', 'POS', 'PTS']
+        self.LONG_STR           = '------------------------------------------------\n'
+                        
     def CreateTeams(self):
         
-        '''Create a Dictionary and convert to a panel'''
-        
-        # ToDo: Should this be moved? (maybe not since it clears teams?)
-        
-        # Set Local Variables
-        teamsTmp        = {};       
+        # Loop thru teamnames - Dict of Team Data Frame
+        teamsTmp        = {}       
 
-        # Create Panel - Loop thru each team name and generate Data Frame
         for name in self.teamNames:
-            teamFrame       = pd.DataFrame(columns=self.teamCol,\
-                              index=np.arange(self.rounds));
+            teamFrame       = pd.DataFrame(columns=self.DF_TEAM_COLUMN, index=np.arange(self.rounds))
+            teamFrame.name  = name          # ToDo: Cannot save data frame name to panel
+            teamsTmp[name]  = teamFrame
             teamFrame.index.name = 'rnd'
-            teamsTmp[name]  = teamFrame;
 
         # Convert Dict to Panel
         self.teams   = pd.Panel(teamsTmp);
@@ -98,17 +95,18 @@ class DraftSimulator:
             namesTmp.reverse();
     
     def CreateDraftResultStruct(self):
-        
-        '''Store Results from Drafts'''
-                
-        colDraftRes = ['RND', 'TEAM', 'ID', 'POS', 'PTS'];
+ 
+        # Index for Draft Results (just 0:1:NUM_OF_PICKS)
         idxDraftRes = np.arange(np.size(self.DraftOrder))
         
-        self.DraftResults = pd.DataFrame(columns=colDraftRes, index=idxDraftRes);
+        self.DraftResults = pd.DataFrame(columns=self.DF_DRAFTRES_COLUMN, index=idxDraftRes);
         self.DraftResults.index.name    = 'pick #'
         
     def GetAvailablePlayers(self, players, team):
 
+        ''' Return available players to draft based on players/positions already drafted'''
+        
+        # Copy players - cannot alter total avaialbe players for all teams
         playersAv   = players.copy();
         posCnt      = team['pos'].value_counts();               
 
@@ -119,45 +117,48 @@ class DraftSimulator:
 
         return(playersAv);
 
-    def RemovePlayersOnTeam(self, players, team):
-
-        for key in team['id']:
-            players = players[players['id'] != key];
-            print key
-
-        return(players);
-
     def SelectPlayer(self, players, teamPick):
  
-        # -----------------------------------------------------------
-        # Returns the index (select) of the player to select
-        #   - Choose how to select a player (max points, slope, pos)
-        #   - Choose how to break a tie
-        #   - This is one of the most important functions!
-        # -----------------------------------------------------------
-        draft       = self.teamsDraft.ix[teamPick]
-        playersAv   = self.GetAvailablePlayers(players, self.teams[teamPick]);
+        ''' return the INDEX of player-to-draft'''
+ 
+        playersAv   = self.GetAvailablePlayers(players, self.teams[teamPick])
+        options     = self.GetTeamDraftOptions(playersAv, teamPick)
+        select      = self.SelectBetweenDraftOptions(options, teamPick)
         
-        # Select Player based on method
+        return(select)
+    
+    def GetTeamDraftOptions(self, players, teamPick):
+        
+        ''' Find Draft Options Based on Team Draft Strategy '''
+        
+        draft       = self.teamStrategy.ix[teamPick]
+
         if draft['strategy']  == 'max':
-            options     = playersAv.pts == playersAv.pts.max();
+            options     = players.pts == players.pts.max();
             
         elif draft['strategy']  == 'rank':
-            options     = playersAv.rnk == playersAv.rnk.min();
+            options     = players.rnk == players.rnk.min();
             
         elif draft['strategy']  == 'user':
-            options  = self.SelectPlayerManually(playersAv, draft.name);
+            options  = self.SelectPlayerManually(players, draft.name);
 
         elif draft['strategy']  == 'depth':
-            options     = self.DepthFirstSearch(teamPick, playersAv);
+            options     = self.DepthFirstSearch(teamPick, players);
 
         elif draft['strategy']  == 'breath':
-            options     = self.BreathFirstSearch(teamPick, playersAv);
+            options     = self.BreathFirstSearch(teamPick, players);
 
         else:
             print 'Draft Selection Type not Supported yet!'
 
-        # Method to break tie (multi-player selection)
+        return(options)
+    
+    def SelectBetweenDraftOptions(self, options, teamPick):
+        
+        ''' Choose Between Multiple Draft Option Based on Team Tie Breaker '''
+        
+        draft       = self.teamStrategy.ix[teamPick]
+
         if draft['breakTie'] == 'random':
             select  = random.choice(options[options==True].index);
 
@@ -174,11 +175,12 @@ class DraftSimulator:
         
     def SelectPlayerManually(self, players, name):
         
+        ''' Let USER (Person) Choose which Player to Draft '''
+        
         turns       = 0;
         MAX_TURNS   = 5;
         
-        print 'Your Team:\n', self.teams[name];
-        print '\nAvailable Players:\n', players[:20];
+        print 'Your Team:\n', self.teams[name], '\nAvailable Players:\n', players[:20];
         
         while turns < MAX_TURNS:
             
@@ -192,14 +194,15 @@ class DraftSimulator:
             while True:
                 turns   += 1;
                 try:
-                    select  = np.int64(raw_input('\nYo ' + name + ' Select a Player (use LHS index to select):\n'));
+                    select  = np.int64(raw_input('\nYo ' + name + \
+                             ' Select a Player (use LHS index to select):\n'));
                     break;
                 except ValueError:
-                    print "\nOops!  That was not a valid number.\nPlease try (again) to Select a Player:", self.LONG_STR ;
+                    print '\nOops!  That was not a valid number.\n'
+                    print 'Please try (again) to Select a Player:', self.LONG_STR ;
                     
             # Check that user selected a valid player
-            check   = players[players.index == select]    
-            if check.empty:
+            if players[players.index == select].empty:
                 print '\nNo player with index = ' + str(select) + ', Please Select Again!\n';
             else:
                 break;
@@ -210,88 +213,87 @@ class DraftSimulator:
             print 'Do not worry, I will choose the player with the max projected points for you!';
             options     = players.pts == players.pts.max();
         else:
-            options     = players.id == players.ix[select]['id'];
+            options     = players.index.to_series() == select;
             
         return(options);
           
     def BreathFirstSearch(self, teamPick, players):
         
-        # Create lists (yes not numpy arrays)
-        rnd     = [];
-        pos     = [];
-        team    = self.teams[teamPick];
-
-        if team.pos.last_valid_index() == None:
-            CURRENT_ROUND   = 0;
-        else:
-            CURRENT_ROUND   = team.last_valid_index() + 1;
+        # Set Initial Conditions
+        team        = self.teams[teamPick]
+        nodes       = []
+        playersOpt  = []; playersOpt.append(players.copy())
+        optionsTmp  = []; optionsTmp.append(team.copy())
+        optionsCmp  = list(optionsTmp); optionsCmp.pop(0)   # Empty Panel of completed teams 
         
-        rnd.append(CURRENT_ROUND);
+        self.BreathFirstSearchRecur(teamPick, nodes, playersOpt, optionsTmp, optionsCmp)
         
-        # Create lists of data frames
-        playersOpt  = [];playersOpt.append(players.copy()); 
-        optionsTmp  = [];optionsTmp.append(team.copy());
-        optionsCmp  = list(optionsTmp); # make a new copy
-        optionsCmp.pop(0);              # Empty Panel - no completed teams yet!
-        
-        self.BreathFirstSearchRecur(teamPick, pos, rnd, playersOpt, optionsTmp, optionsCmp)
-        
-        # Find player to draft based on max points:
-        # ToDo: If branches tie need to return options that reflect this!
-        maxPts      = 0;
-        PLAYER_ID   = optionsCmp[0].id[0];
-        
-        for df in optionsCmp:
-            pts = df.pts.sum();
-            if pts > maxPts:
-                maxPts      = pts;
-                PLAYER_ID   = df.id[CURRENT_ROUND];
-                
-        options     = players.id == PLAYER_ID;
+        PLAYER_ID   = self.GetBestDraftOptionFromBranch(optionsCmp, team.pos.count())
+        options     = players.id == PLAYER_ID
         
         return(options)
-    
-    def BreathFirstSearchRecur(self, teamPick, nodes, rnd, playerList, draftList, draftCmp):        
- 
-        # Get all branches for current node
-        nodeCnt = -1;
-        players = playerList.pop(0);
-        draft   = draftList.pop(0);
-        round   = rnd.pop(0);
         
-        if nodes == []:
-            allPos = players.pos.unique().tolist();
+    def GetBestDraftOptionFromBranch(self, options, CURRENT_RND):
+
+        ''' 'Find player to draft based on max points '''
+        
+        # ToDo: If branches tie need to return options that reflect this!
+        
+        # Set Initial Conditions
+        maxPts      = 0
+        PLAYER_ID   = options[0].id[0]
+        
+        # High Water Mark Max Search Algorithm
+        for df in options:
+            if df.pts.sum() > maxPts:
+                maxPts      = df.pts.sum()
+                PLAYER_ID   = df.id[CURRENT_RND]
+        
+        return(PLAYER_ID)    
+        
+    def BreathFirstSearchRecur(self, teamPick, nodes, playerList, draftList, draftCmp):        
+ 
+        # Initial Conditons for Current Node
+        players         = playerList.pop(0)
+        draft           = draftList.pop(0)
+        CURRENT_RND     = draft.pos.count() #rndList.pop(0)
+        
+        # Check if First Round - Kick start on first entry
+        if nodes == []:     
+            allPos = players.pos.unique().tolist()
         else:
-            allPos  = nodes.pop(0);
+            allPos  = nodes.pop(0)
             
-        # For first branch - Draft and add player to team:       
+        # Draft Based on Position Before Expanding (next) Node
         for pos in allPos:
-            playerList.insert(0, players.copy());
-            draftList.insert( 0,   draft.copy());
-            rnd.insert(0, round);
             
-            nodeCnt     += 1;
-            playersAv   = players[players['pos'] == pos] 
-            options     = playersAv.pts == playersAv.pts.max();
-            select      = random.choice(options[options==True].index);
-            self.PlacePlayerOnTeam(playersAv.ix[select], draftList[0], rnd[0], -2);
-            playerList[0]  = players.drop(select);
-            playerList[0]  = self.DropProjectedPlayers(rnd[0], playerList[0], teamPick);
+            # Push an untouched copy of players/team/round to top of list
+            playerList.insert(0, players.copy())
+            draftList.insert( 0,   draft.copy())
             
-            # After selection update available players
-            if rnd[0] == self.rounds-1:
-                rnd.pop(0);
-                playerList.pop(0);
-                draftCmp.insert(0,draftList.pop(0));
+            # Get Best Player to Draft and updated available players
+            playersAv       = players[players['pos'] == pos] 
+            options         = playersAv.pts == playersAv.pts.max()
+            select          = random.choice(options[options==True].index)
+            playerList[0]   = players.drop(select)
+            playerList[0]   = self.DropProjectedPlayers(CURRENT_RND, playerList[0], teamPick)
+            
+            self.PlacePlayerOnTeam(playersAv.ix[select], draftList[0], CURRENT_RND, -2)
+ 
+            # Check if End of Branch           
+            if CURRENT_RND == self.rounds-1:
+                playerList.pop(0)
+                draftCmp.insert(0,draftList.pop(0))
             else:
-                playerList[0]   = self.GetAvailablePlayers(playerList[0], draftList[0]);
-                nodes.insert(0, playerList[0].pos.unique().tolist());
+                playerList[0]   = self.GetAvailablePlayers(playerList[0], draftList[0])
+                nodes.insert(0, playerList[0].pos.unique().tolist())
                 
-        # check if current branch has been exhausted
+        # check if branch is exhausted
         if nodes != []:
-            rnd[0]  += 1;
-            self.BreathFirstSearchRecur(teamPick, nodes, rnd, playerList, draftList, draftCmp)
+            self.BreathFirstSearchRecur(teamPick, nodes, playerList, draftList, draftCmp)
               
+        # If we get here we're done!!
+        
     def DepthFirstSearch(self, teamPick, players):
         
         # Create lists (yes not numpy arrays)
@@ -340,6 +342,8 @@ class DraftSimulator:
             options         = playersAv.pts == playersAv.pts.max();
             select          = random.choice(options[options==True].index);
             playersOpt[0]   = playersOpt[0].drop(select);
+            
+            
             self.PlacePlayerOnTeam(playersAv.ix[select], optionsTmp[0], rnd[0], -2);
             playersOpt[0]   = self.DropProjectedPlayers(rnd[0], playersOpt[0], teamPick);
             pos.pop(0) if pos[0] == [] else 0;
@@ -349,7 +353,6 @@ class DraftSimulator:
         playersOpt[0]   = self.GetAvailablePlayers(playersOpt[0], team);
         posAv           = playersOpt[0].pos.unique();
          
-        
         # Save rest of branches
         if posAv.any():
             pos.insert(0, posAv.tolist());
@@ -365,8 +368,6 @@ class DraftSimulator:
             rnd.pop(0);
             playersOpt.pop(0);
             optionsCmp.insert(0, optionsTmp.pop(0));
-            #print optionsTmp
-            #print optionsCmp
             
         # If all nodes + branches have not been expanded
         if pos != []:
@@ -374,9 +375,6 @@ class DraftSimulator:
             
     def DropProjectedPlayers(self, rnd, players, teamName):
         
-        # For Breath First Search Algo
-        # Note: Must have already dropped players on team from players!
-
         # Get the number of rounds completed
         numDropPlayers = -1;
         teamDraftCount = 0;
@@ -404,8 +402,7 @@ class DraftSimulator:
                 
                 playersLeft = playersLeft.append(players.ix[select]);
                 playersLeft.sort(columns='pts', ascending=False, inplace=True);
-
-            
+        
         return(playersLeft);
     
     def PlacePlayerOnTeam(self, player, team, rnd, i):
@@ -435,7 +432,6 @@ class DraftSimulator:
         self.CreateDraftResultStruct();
         
         # Create Local Copies        
-        #teams       = self.teams;        # DEL: Why is this necessary
         players     = playersNew.copy();
 
         # Kick of Draft
@@ -459,7 +455,6 @@ class DraftSimulator:
         
         teamsAnalysis.index.name        = 'team';
         playersAnalysis.index.name      = 'id';
-        
 
         # Run-Multi Drafts and Gather Data
         # -----------------------------------------------------------

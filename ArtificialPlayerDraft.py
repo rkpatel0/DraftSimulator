@@ -10,39 +10,40 @@ import ffa.scratch_sheet as tmp;
 # Generate Draft Information:
 # -------------------------------------------------------
 
-# 1. Generate Data
+# 1. Draft Settings
 #--------------------------------------------------------
-# Player Frame/Classes
-pColumns  = ['QB', 'RB', 'WR', 'TE']        # columns
+pColumns  = ['QB', 'RB', 'WR', 'TE']       
 nSpots    = [   1,    2,    2,    1]
 rSlope    = [  15,   15,    5,    5]
 rStart    = [ 400,  400,  400,  250]
 pIndex    = ['spots', 'slope', 'start'];
 
-# Team Data Panel
-tcol      =            [     'strategy'  , 'breakTie' ];  
-draftData = np.reshape(['A',  'rank',      'random'   ,\
-                        'RDP', 'rank',     'random'   ,\
-                        'RKP', 'rank',   'random'   ,\
-                        'D',   'rank',     'random'   ,\
-                        ], (4,3))
-
-# Generate Data Frames...
 posArray    = np.reshape([nSpots,rSlope, rStart],(3,4));
 posFrame    = pd.DataFrame(posArray, columns=pColumns,index=pIndex);
-draftInfo   = pd.DataFrame(draftData[:,1:], index=draftData[:,0], columns=tcol)
 
-# Create Classes:
+# 2. Team Settings
+#--------------------------------------------------------
+tcol      =            [         'strategy'   , 'breakTie' ];  
+teamData  = np.reshape(['A'   ,  'rank'       , 'random'   ,\
+                        'B'   ,  'breath'     , 'random'   ,\
+                        'C'   ,  'rank'       , 'random'   ,\
+                        'D'   ,  'rank'       , 'random'   ,\
+                        ], (4,3))
+
+draftInfo   = pd.DataFrame(teamData[:,1:], index=teamData[:,0], columns=tcol)
+
+# 3. Generate Player Class
+#--------------------------------------------------------
 oGp         = players.CreatePlayers(posFrame, len(draftInfo.index));
-oD          = draft.DraftSimulator(posFrame, draftInfo);
+
 oP          = playersReal.GetPlayers();
-players     = oP.GetSeasonStats(2012)
-playersNew  = oP.CleanPlayersForDraftSim(players);
+players     = oP.GetSeasonStats(2011)
+players     = oP.CleanPlayersForDraftSim(players);
 
-
-# Parameters to modify...
-oD.DRAFTS_TO_RUN  = 100;
-
-playersAnalysis = oD.RunMultipleDrafts(oGp.players);
+# 4. Kick-Off Draft
+#--------------------------------------------------------
+oD                  = draft.DraftSimulator(posFrame, draftInfo);
+oD.DRAFTS_TO_RUN    = 1;
+playersAnalysis     = oD.RunMultipleDrafts(players);
     
 print 'done!'

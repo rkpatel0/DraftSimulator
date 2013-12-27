@@ -44,7 +44,7 @@ class DraftSimulator:
 
         # Save Info Passed to Object
         self.playerInfo = playerInfo;
-        self.teamsDraft = teamsDraft;
+        self.teamStrategy = teamsDraft;
 
         self.SetInstanceVariables()
 
@@ -57,14 +57,14 @@ class DraftSimulator:
         self.PRINT_PLAYER_ANALYSIS  = True;
         self.PRINT_PLOTS            = False;
         
-        self.teamNames      = self.teamsDraft.index;
+        self.teamNames      = self.teamStrategy.index;
         self.numOfTeams     = len(self.teamNames);
         self.rounds         = sum(self.playerInfo.ix['spots']);
         
         # Static
         self.SelectType     = 'max_points';
         self.BreakTieType   = 'random';
-        self.teamCol        = ['pick', 'pos', 'pts', 'id'];     # output format
+        self.DF_TEAM_COLUMN        = ['pick', 'pos', 'pts', 'id'];     # output format
                                                                 
     def CreateTeams(self):
         
@@ -77,7 +77,7 @@ class DraftSimulator:
 
         # Create Panel - Loop thru each team name and generate Data Frame
         for name in self.teamNames:
-            teamFrame       = pd.DataFrame(columns=self.teamCol,\
+            teamFrame       = pd.DataFrame(columns=self.DF_TEAM_COLUMN,\
                               index=np.arange(self.rounds));
             teamsTmp[name]  = teamFrame;
 
@@ -132,7 +132,7 @@ class DraftSimulator:
         #   - Choose how to break a tie
         #   - This is one of the most important functions!
         # -----------------------------------------------------------
-        draft       = self.teamsDraft.ix[teamPick]
+        draft       = self.teamStrategy.ix[teamPick]
         playersAv   = self.GetAvailablePlayers(players, self.teams[teamPick]);
         
         # Select Player based on method
