@@ -256,7 +256,7 @@ class DraftSimulator:
         # Initial Conditons for Current Node
         players         = playerList.pop(0)
         draft           = draftList.pop(0)
-        CURRENT_RND     = draft.pos.count() #rndList.pop(0)
+        CURRENT_RND     = draft.pos.count()
         
         # Check if First Round - Kick start on first entry
         if nodes == []:     
@@ -278,7 +278,7 @@ class DraftSimulator:
             playerList[0]   = players.drop(select)
             playerList[0]   = self.DropProjectedPlayers(CURRENT_RND, playerList[0], teamPick)
             
-            self.PlacePlayerOnTeam(playersAv.ix[select], draftList[0], CURRENT_RND, -2)
+            self.PlacePlayerOnTeam(playersAv.ix[select], draftList[0], -2)
  
             # Check if End of Branch           
             if CURRENT_RND == self.rounds-1:
@@ -405,18 +405,21 @@ class DraftSimulator:
         
         return(playersLeft);
     
-    def PlacePlayerOnTeam(self, player, team, rnd, i):
+    def PlacePlayerOnTeam(self, player, team, i):
         
+        RND     = team.pos.count()
+
         # Add Player to Team
-        team.ix[rnd]['pts']     = player['pts'];
-        team.ix[rnd]['pos']     = player['pos'];
-        team.ix[rnd]['id']      = player['id'];
-        team.ix[rnd]['pick']    = i+1;
-        team.ix[rnd]['posRnk']  = player['posRnk'];
+        team.ix[RND]['pts']     = player['pts'];
+        team.ix[RND]['pos']     = player['pos'];
+        team.ix[RND]['id']      = player['id'];
+        team.ix[RND]['pick']    = i+1;
+        team.ix[RND]['posRnk']  = player['posRnk'];
 
-    def AddPlayerToDraftResults(self, player, i, teamName):
+    def AddPlayerToDraftResults(self, player, teamName):
 
-        rnd         = np.uint(i/self.numOfTeams);
+        rnd     = self.teams[teamName]['pos'].count()
+        i       = self.DraftResults['RND'].count()
         
         self.DraftResults.ix[i]['TEAM']  = teamName;
         self.DraftResults.ix[i]['RND']   = rnd + 1;
@@ -434,15 +437,14 @@ class DraftSimulator:
         # Create Local Copies        
         players     = playersNew.copy();
 
-        # Kick of Draft
+        # Start the Draft
         for i, teamPick in enumerate(self.DraftOrder):
 
-            team        = self.teams[teamPick];             # ToDo: MESSY TOO!
-            rnd         = np.uint(i/self.numOfTeams);       # ToDo: Remove and self calculate
-            
+            team        = self.teams[teamPick];             # TODO: MESSY TOO!
             select      = self.SelectPlayer(players, teamPick);
-            self.PlacePlayerOnTeam(players.ix[select], team, rnd, i);
-            self.AddPlayerToDraftResults(players.ix[select], i, teamPick);
+            
+            self.PlacePlayerOnTeam(players.ix[select], team, i);
+            self.AddPlayerToDraftResults(players.ix[select], teamPick);
             players     = players.drop(select);
             
     def RunMultipleDrafts(self, players):
@@ -489,16 +491,12 @@ class DraftSimulator:
 
     def AnalyzeDraftResults(self, playersAnalysis, teamsAnalysis):
         
-        GOOD_WIN_CHANCE   = 2 * 100 / self.numOfTeams;      # twice the average chance of winning
-        MIN_RUNS_TO_PRINT = self.DRAFTS_TO_RUN > 4;
+        GOOD_WIN_CHANCE         = 2 * 100 / self.numOfTeams;      # twice the average chance of winning
+        MIN_RUNS_TO_PRINT       = self.DRAFTS_TO_RUN > 4;
         
-        # Average Multi-run Data
-        playersAnalysis['win']  = np.float16( playersAnalysis['win'] * 100 / self.DRAFTS_TO_RUN );
-        playersAnalysis['los']  = np.float16( playersAnalysis['los'] * 100 / self.DRAFTS_TO_RUN );
-        playersAnalysis['avg']  = np.float16( playersAnalysis['avg'] * 100 / self.DRAFTS_TO_RUN ) / 100;
-        
-        # Remove undrated players:
-        playersAnalysis = playersAnalysis[playersAnalysis.avg != 0];
+        playersAnalysis         = playersAnalysis[playersAnalysis.avg != 0];        # Remove undrated players:
+        playersAnalysis         = playersAnalysis * 100 / self.DRAFTS_TO_RUN
+        playersAnalysis['avg']  =  playersAnalysis['avg'] / 100;
         
         teamsAnalysis['rnk']    = np.float16( teamsAnalysis['rnk']) / self.DRAFTS_TO_RUN;
         teamsAnalysis['avgPts'] = np.float64( teamsAnalysis['avgPts']) / self.DRAFTS_TO_RUN;

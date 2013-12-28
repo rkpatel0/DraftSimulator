@@ -25,7 +25,7 @@ posFrame    = pd.DataFrame(posArray, columns=pColumns,index=pIndex);
 #--------------------------------------------------------
 tcol      =            [         'strategy'   , 'breakTie' ];  
 teamData  = np.reshape(['A'   ,  'rank'       , 'random'   ,\
-                        'B'   ,  'breath'     , 'random'   ,\
+                        'B'   ,  'rank'     , 'random'   ,\
                         'C'   ,  'rank'       , 'random'   ,\
                         'D'   ,  'rank'       , 'random'   ,\
                         ], (4,3))
@@ -43,7 +43,7 @@ players     = oP.CleanPlayersForDraftSim(players);
 # 4. Kick-Off Draft
 #--------------------------------------------------------
 oD                  = draft.DraftSimulator(posFrame, draftInfo);
-oD.DRAFTS_TO_RUN    = 1;
+oD.DRAFTS_TO_RUN    = 10;
 playersAnalysis     = oD.RunMultipleDrafts(players);
     
 print 'done!'
