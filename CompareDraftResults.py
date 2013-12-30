@@ -69,7 +69,7 @@ DraftResultDict[3]  = oD.DraftResults
 
 playersAnalysis     = oD.RunMultipleDrafts(players.reindex(oD.DraftResults.RANK));
 DraftResultDict[4]  = oD.DraftResults
-DraftResultDict[5]  = players[:48].sort(columns='rnk',ascending=True)
+DraftResultDict[5]  = oD.DraftResults.sort(columns='RANK',ascending=True)
 
 oD.CompareDraftResults(pd.Panel(DraftResultDict))
     
