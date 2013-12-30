@@ -65,26 +65,25 @@ class GetPlayers:
 
         self.CleanUpData()
         self.ComputeFantasyPoints()
-        self.df.FileName = year             # ToDo: Should move but breaks
+        self.df.FileName = year             # TODO: Should move but breaks
         
         return(self.df.copy());
     
     def CleanUpData(self):
         
-        # remove unused columns and replace with new:
+        ''' Clean up Data to match Draft Simulator Class format '''
 
-        # ToDo: Figure out how t directly edit data frame
         self.df         = self.df.fillna(0)
         self.df         = self.df.drop(self.RemoveCol, axis=1)
         self.df.columns = self.StandardCol
         
     def ComputeFantasyPoints(self):
         
-        # Generate Fantasy Points baed on available data and League Settings
+        # Generate Fantasy Points based on available data and League Settings
 
         pts     = np.zeros_like(self.df['PassYds'])     # Create a list of zeros
         
-        # Loop nad Compuate Fantasy Points for each Category
+        # Loop and Compute Fantasy Points for each Category
         for name in self.ptsData.keys():
             curPts  = self.ptsData[name] * self.df[name]
             pts     = curPts + pts

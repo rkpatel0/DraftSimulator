@@ -23,7 +23,7 @@ posFrame    = pd.DataFrame(posArray, columns=pColumns,index=pIndex);
 
 # 2. Team Settings
 #--------------------------------------------------------
-tcol      =            [         'strategy'   , 'breakTie' ];  
+tcol      =            [       'strategy'   , 'breakTie' ];  
 teamData  = np.reshape(['A'   ,  'breath'     , 'random'   ,\
                         'B'   ,  'breath'     , 'random'   ,\
                         'C'   ,  'breath'     , 'random'   ,\
@@ -41,14 +41,36 @@ draftInfo   = pd.DataFrame(teamData[:,1:], index=teamData[:,0], columns=tcol)
 oGp         = players.CreatePlayers(posFrame, len(draftInfo.index));
 
 oP          = playersReal.GetPlayers();
-players     = oP.GetSeasonStats(2012)
+players     = oP.GetSeasonStats(2011)
 players     = oP.CleanPlayersForDraftSim(players);
-players.sort(columns='pts',ascending=False,inplace=True);
 
-# 4. Kick-Off Draft
+# 4. Run Drafts to Compare
 #--------------------------------------------------------
+DraftResultDict     = {}
+
 oD                  = draft.DraftSimulator(posFrame, draftInfo);
 oD.DRAFTS_TO_RUN    = 1
-playersAnalysis     = oD.RunMultipleDrafts(players);
 
+# Set Initial Draft Ranks:
+players.sort(columns='rnk',ascending=True,inplace=True);
+#players.sort(columns='pts',ascending=False,inplace=True);
+
+playersAnalysis     = oD.RunMultipleDrafts(players);
+DraftResultDict[0]  = oD.DraftResults
+
+playersAnalysis     = oD.RunMultipleDrafts(players.reindex(oD.DraftResults.RANK));
+DraftResultDict[1]  = oD.DraftResults
+
+playersAnalysis     = oD.RunMultipleDrafts(players.reindex(oD.DraftResults.RANK));
+DraftResultDict[2]  = oD.DraftResults
+
+playersAnalysis     = oD.RunMultipleDrafts(players.reindex(oD.DraftResults.RANK));
+DraftResultDict[3]  = oD.DraftResults
+
+playersAnalysis     = oD.RunMultipleDrafts(players.reindex(oD.DraftResults.RANK));
+DraftResultDict[4]  = oD.DraftResults
+DraftResultDict[5]  = players[:48].sort(columns='rnk',ascending=True)
+
+oD.CompareDraftResults(pd.Panel(DraftResultDict))
+    
 print 'done!'
