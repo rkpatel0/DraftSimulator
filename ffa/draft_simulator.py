@@ -34,6 +34,8 @@ import pandas as pd
 import numpy as np
 import random
 import matplotlib.pyplot as plt
+import os
+import markdown as md
 
 #===============================================================================
 # My Class
@@ -43,7 +45,7 @@ class DraftSimulator:
     def __init__(self, playerInfo, teamsDraft):
 
         # Save Info Passed to Object
-        self.playerInfo     = playerInfo       # Master List of players
+        self.playerInfo     = playerInfo       # Master List of simPlayers
         self.teamStrategy   = teamsDraft       
 
         # Set Default Conditons
@@ -54,6 +56,7 @@ class DraftSimulator:
     def SetDraftDefault(self):
 
         self.DRAFTS_TO_RUN      = 1
+        self.RUNS_TO_LEARN      = 10
         self.SEARCH_DROP_RANK   = 'rnk'
         self.teamNames          = self.teamStrategy.index
         self.numOfTeams         = len(self.teamNames)
@@ -64,10 +67,20 @@ class DraftSimulator:
         self.PRINT_DRAFT_RESULTS    = True
         self.PRINT_PLAYER_ANALYSIS  = True
         self.PRINT_PLOTS            = True
+        self.SAVE_DATA_PATH         = r'../../Analysis/'
+        self.PROJECT_DIR            = 'TEST_ME/'
         
+        self.PATH   = self.SAVE_DATA_PATH + self.PROJECT_DIR
+        print 'Project Log Path:' + self.PATH
+        
+        if not os.path.exists(self.PATH):
+            os.makedirs(self.PATH)
+        
+        self.LOG     = open(self.PATH + 'DraftResults.html', 'w');
+
     def SetConstants(self):
-        self.DF_TEAM_COLUMN     = ['pick', 'pos', 'pts', 'posRnk', 'id']
-        self.DF_DRAFTRES_COLUMN = ['RANK', 'RND', 'TEAM', 'ID', 'POS', 'PTS']
+        self.DF_TEAM_COLUMN     = ['pick', 'pos',   'pts', 'posRnk', 'id']
+        self.DF_DRAFTRES_COLUMN = ['RANK', 'P_IDX', 'RND', 'TEAM', 'ID', 'POS', 'PTS']
         self.LONG_STR           = '------------------------------------------------\n'
                         
     def CreateTeams(self):
@@ -98,56 +111,56 @@ class DraftSimulator:
     def CreateDraftResultStruct(self):
  
         # Index for Draft Results (just 0:1:NUM_OF_PICKS)
-        idxDraftRes = np.arange(np.size(self.DraftOrder)) + 1
+        idxDraftRes = np.arange(np.size(self.DraftOrder))
         
         self.DraftResults = pd.DataFrame(columns=self.DF_DRAFTRES_COLUMN, index=idxDraftRes);
         self.DraftResults.index.name    = 'pick #'
         
-    def GetAvailablePlayers(self, players, team):
+    def GetAvailablePlayers(self, simPlayers, team):
 
-        ''' Return available players to draft based on players/positions already drafted'''
+        ''' Return available simPlayers to draft based on simPlayers/positions already drafted'''
         
-        # Copy players - cannot alter total avaialbe players for all teams
-        playersAv   = players.copy();
-        posCnt      = team['pos'].value_counts();               
-
-        # remove players that have reached limit
-        for pos in posCnt.index:
-            if posCnt[pos] >= self.playerInfo[pos]['spots']:
-                playersAv = playersAv[playersAv.pos != pos];    
+        # Copy simPlayers - cannot alter total avaialbe simPlayers for all teams
+        playersAv   = simPlayers.copy();
+        teamPos = team['pos']
+        
+        # remove simPlayers that have reached limit
+        for pos in self.playerInfo.columns:
+            if teamPos[teamPos == pos].count() >= self.playerInfo[pos]['spots']:
+                playersAv = playersAv[playersAv.pos != pos]
 
         return(playersAv);
 
-    def SelectPlayer(self, players, teamPick):
+    def SelectPlayer(self, simPlayers, teamPick):
  
         ''' Return the INDEX of player-to-draft'''
  
-        playersAv   = self.GetAvailablePlayers(players, self.teams[teamPick])
+        playersAv   = self.GetAvailablePlayers(simPlayers, self.teams[teamPick])
         options     = self.GetTeamDraftOptions(playersAv, teamPick)
         select      = self.SelectBetweenDraftOptions(options, teamPick)
         
         return(select)
     
-    def GetTeamDraftOptions(self, players, teamPick):
+    def GetTeamDraftOptions(self, simPlayers, teamPick):
         
         ''' Find Draft Options Based on Team Draft Strategy '''
         
         draft   = self.teamStrategy.ix[teamPick]
         
         if draft['strategy']  == 'max':
-            options     = players.pts == players.pts.max();
+            options     = simPlayers.pts == simPlayers.pts.max();
             
         elif draft['strategy']  == 'rank':
-            options     = players.rnk == players.rnk.min();
+            options     = simPlayers.rnk == simPlayers.rnk.min();
             
         elif draft['strategy']  == 'user':
-            options  = self.SelectPlayerManually(players, draft.name);
+            options  = self.SelectPlayerManually(simPlayers, draft.name);
 
         elif draft['strategy']  == 'depth':
-            options     = self.DepthFirstSearch(teamPick, players);
+            options     = self.DepthFirstSearch(teamPick, simPlayers);
 
         elif draft['strategy']  == 'breath':
-            options     = self.BreathFirstSearch(teamPick, players);
+            options     = self.BreathFirstSearch(teamPick, simPlayers);
 
         else:
             print 'Draft Selection Type not Supported yet!'
@@ -174,7 +187,7 @@ class DraftSimulator:
  
         return(select);
         
-    def SelectPlayerManually(self, players, name):
+    def SelectPlayerManually(self, simPlayers, name):
         
         ''' Let USER (Person) Choose which Player to Draft '''
         
@@ -184,12 +197,12 @@ class DraftSimulator:
         
         # check if there is only one player left
         if self.teams[name]['pos'].count() == self.rounds - 1:
-            options = players.pts == players.pts.max()
-            print '\nYour last pick was:\n', players[options]
+            options = simPlayers.pts == simPlayers.pts.max()
+            print '\nYour last pick was:\n', simPlayers[options]
             return(options)
             
         print 'Your Team:\n', self.teams[name], '\nAvailable Players:\n',\
-              players[:PLAYERS_TO_DISPLAY];
+              simPlayers[:PLAYERS_TO_DISPLAY];
         while turns < MAX_TURNS:
             
             # Ask user to select player
@@ -204,7 +217,7 @@ class DraftSimulator:
                     print 'Please try (again) to Select a Player:', self.LONG_STR ;
                     
             # Check that user selected a valid player
-            if players[players.index == select].empty:
+            if simPlayers[simPlayers.index == select].empty:
                 print '\nNo player with index = ' + str(select) +\
                       ', Please Select Again!\n';
             else:
@@ -215,13 +228,13 @@ class DraftSimulator:
             print 'Okay, someone does not know how to draft!';
             print 'Do not worry, I will choose the player '\
                   'with the max projected points for you!';
-            options     = players.pts == players.pts.max();
+            options     = simPlayers.pts == simPlayers.pts.max();
         else:
-            options     = players.index.to_series() == select;
+            options     = simPlayers.index.to_series() == select;
             
         return(options);
     
-    def DepthFirstSearch(self, teamPick, players):
+    def DepthFirstSearch(self, teamPick, simPlayers):
         
         # Create lists (yes not numpy arrays)
         rnd     = [];
@@ -236,7 +249,7 @@ class DraftSimulator:
         rnd.append(CURRENT_ROUND);
         
         # Create lists of data frames
-        playersOpt  = [];playersOpt.append(players.copy()); 
+        playersOpt  = [];playersOpt.append(simPlayers.copy()); 
         optionsTmp  = [];optionsTmp.append(team.copy());
         optionsCmp  = list(optionsTmp); # make a new copy
         optionsCmp.pop(0);              # Empty Panel - no completed teams yet!
@@ -254,7 +267,7 @@ class DraftSimulator:
                 maxPts      = pts;
                 PLAYER_ID   = df.id[CURRENT_ROUND];
                 
-        options     = players.id == PLAYER_ID;
+        options     = simPlayers.id == PLAYER_ID;
         
         return(options)
                
@@ -276,7 +289,7 @@ class DraftSimulator:
             pos.pop(0) if pos[0] == [] else 0;
             rnd[0]          += 1;
             
-        # After selection update available players
+        # After selection update available simPlayers
         playersOpt[0]   = self.GetAvailablePlayers(playersOpt[0], team);
         posAv           = playersOpt[0].pos.unique();
          
@@ -311,21 +324,22 @@ class DraftSimulator:
         # High Water Mark Max Search Algorithm
         for df in options:
             if df.pts.sum() == maxPts and PlayerID.count(df.id[CURRENT_RND]) == 0:
-                print 'hey now there is a tie!! what should we do?'
+                print 'AI Search found a tie - using randomly selecting tie-breaker...'
                 PlayerID.append(df.id[CURRENT_RND])        # Add to selected player pool
                 
             elif df.pts.sum() > maxPts:
                 maxPts      = df.pts.sum()
-                PlayerID    = [df.id[CURRENT_RND]]      # Clear all previously selected players
+                PlayerID    = [df.id[CURRENT_RND]]      # Clear all previously selected simPlayers
         
         return(PlayerID)    
            
-    def BreathFirstSearch(self, teamPick, players):
+    def BreathFirstSearch(self, teamPick, simPlayers):
         
         # Set Initial Conditions
         team        = self.teams[teamPick]
-        nodes       = []; nodes.insert(0, players.pos.unique().tolist())
-        playersOpt  = []; playersOpt.append(players.copy())
+        playerTmp   = self.GetAvailablePlayers(simPlayers, team)
+        nodes       = []; nodes.insert(0, playerTmp.pos.unique().tolist())
+        playersOpt  = []; playersOpt.append(simPlayers.copy())
         optionsTmp  = []; optionsTmp.append(team.copy())
         optionsCmp  = list(optionsTmp); optionsCmp.pop(0)   # Empty Panel of completed teams 
         
@@ -334,7 +348,7 @@ class DraftSimulator:
         
         # Find best player based on results
         PlayerID   = self.GetBestDraftOptionFromBranch(optionsCmp, team.pos.count())
-        options    = players.id.isin(PlayerID)
+        options    = simPlayers.id.isin(PlayerID)
         
         return(options)
         
@@ -342,25 +356,25 @@ class DraftSimulator:
  
         # Initial Conditions for Current Node
         THIS_WORKS_BETTER   = False
-        players         = playerList.pop(0)
+        simPlayers         = playerList.pop(0)
         draft           = draftList.pop(0)
         CURRENT_RND     = draft.pos.count()
         
         # Draft Based on Position Before Expanding (next) Node
         for pos in nodes.pop(0):
             
-            # Push an untouched copy of players/team/round to top of list
-            playerList.insert(0, players.copy())
+            # Push an untouched copy of simPlayers/team/round to top of list
+            playerList.insert(0, simPlayers.copy())
             draftList.insert( 0,   draft.copy())
             
             # Add best player for pos to team
-            playersAv       = players[players['pos'] == pos] 
+            playersAv       = simPlayers[simPlayers['pos'] == pos] 
             options         = playersAv.pts == playersAv.pts.max()
             select          = random.choice(options[options==True].index)
             self.PlacePlayerOnTeam(playersAv.ix[select], draftList[0], -2)
 
-            # Update Total Players: Drop player and all players projected to be gone
-            playerList[0]   = players.drop(select)
+            # Update Total Players: Drop player and all simPlayers projected to be gone
+            playerList[0]   = simPlayers.drop(select)
             playerList[0]   = self.DropProjectedPlayers(CURRENT_RND, playerList[0], teamPick, draftList[0])
  
             # Check if End of Branch           
@@ -380,7 +394,7 @@ class DraftSimulator:
         if nodes != []:
             self.BreathFirstSearchRecur(teamPick, nodes, playerList, draftList, draftCmp)
         
-    def DropProjectedPlayers(self, rnd, players, teamName, tmp):
+    def DropProjectedPlayers(self, rnd, simPlayers, teamName, tmp):
         
         # Get the number of rounds completed
         numDropPlayers = -1;
@@ -395,19 +409,19 @@ class DraftSimulator:
             if teamDraftCount > rnd:
                 numDropPlayers += 1;
         
-        # Drop projected-to-be-gone-players
-        playersLeft = players[numDropPlayers:]
+        # Drop projected-to-be-gone-simPlayers
+        playersLeft = simPlayers[numDropPlayers:]
 
         # Re-Add player by position if all have been removed
-        for pos in players.pos.unique():
+        for pos in simPlayers.pos.unique():
             if not playersLeft.pos[playersLeft.pos == pos].any():
                 
                 # Find Min Player for Pos
-                playerOpt   = players[players.pos == pos]
+                playerOpt   = simPlayers[simPlayers.pos == pos]
                 options     = playerOpt.pts.min() == playerOpt.pts
                 select      = random.choice(options[options==True].index);
                 
-                playersLeft = playersLeft.append(players.ix[select]);
+                playersLeft = playersLeft.append(simPlayers.ix[select]);
         
         return(playersLeft);
     
@@ -425,9 +439,10 @@ class DraftSimulator:
     def AddPlayerToDraftResults(self, player, teamName):
 
         rnd     = self.teams[teamName]['pos'].count()
-        i       = self.DraftResults['RND'].count() + 1
+        i       = self.DraftResults['RND'].count() #+ 1
         
         self.DraftResults.ix[i]['RANK']  = player['rnk'];
+        self.DraftResults.ix[i]['P_IDX'] = player.name
         self.DraftResults.ix[i]['RND']   = rnd
         self.DraftResults.ix[i]['TEAM']  = teamName;
         self.DraftResults.ix[i]['ID']    = player['id'];
@@ -442,24 +457,55 @@ class DraftSimulator:
         self.CreateDraftResultStruct();
         
         # Create Local Copies        
-        players     = playersNew.copy();
+        simPlayers     = playersNew.copy();
 
         # Start the Draft
         for i, teamPick in enumerate(self.DraftOrder):
 
             team        = self.teams[teamPick];             # TODO: MESSY TOO!
-            select      = self.SelectPlayer(players, teamPick);
+            select      = self.SelectPlayer(simPlayers, teamPick);
             
-            self.PlacePlayerOnTeam(players.ix[select], team, i);
-            self.AddPlayerToDraftResults(players.ix[select], teamPick);
-            players     = players.drop(select);
+            self.PlacePlayerOnTeam(simPlayers.ix[select], team, i);
+            self.AddPlayerToDraftResults(simPlayers.ix[select], teamPick);
+            simPlayers     = simPlayers.drop(select);
             
-    def RunMultipleDrafts(self, players):
+    def GeneratePlayerDraftRanks(self, players):
+        
+        ''' Generate Player Draft Ranks by iterativly learning from AI '''
+        
+        COMPARE_RESULTS     = True
+        STRATEGY_TO_USE     = 'breath'
+        
+        # Set all team strategy
+        teamStrategySave    = self.teamStrategy.copy()
+        self.teamStrategy['strategy'] = STRATEGY_TO_USE
+        
+        DraftResultDict     = {}
+
+        for i in np.arange(self.RUNS_TO_LEARN):
+            self.RunDraft(players)
+            DraftResultDict[i+1]  = self.DraftResults
+            players         = players.reindex(self.DraftResults.P_IDX)
+            players['rnk']  = np.arange(len(players))
+        
+        # Add Initial Draft Ranks
+        DraftResultDict[0]  = self.DraftResults.sort(columns='PTS',ascending=False)
+        DraftResultDict[0].index = np.arange(self.DraftResults['ID'].count())
+
+        if COMPARE_RESULTS:
+            self.CompareDraftResults(pd.Panel(DraftResultDict))
+    
+        # Unset all team strategy to default
+        self.teamStrategy = teamStrategySave
+        print players
+        return(players)
+        
+    def RunMultipleDrafts(self, simPlayers):
         
         '''Use to get statistical information from running multiple drafts'''
         
         # Create Empty Data Frames to save multi-run data
-        playersAnalysis  = pd.DataFrame(index=players['id'].values, columns=['win', 'los', 'avg']).fillna(0);
+        playersAnalysis  = pd.DataFrame(index=simPlayers['id'].values, columns=['win', 'los', 'avg']).fillna(0);
         teamsAnalysis    = pd.DataFrame(index=self.teamNames,       columns=['win', 'los', 'avgPts', 'rnk']).fillna(0);
         
         teamsAnalysis.index.name        = 'team';
@@ -472,7 +518,7 @@ class DraftSimulator:
         for i in np.arange(self.DRAFTS_TO_RUN):
 
             # Kick off Draft
-            self.RunDraft(players);
+            self.RunDraft(simPlayers);
             
             # Grab team points from draft
             points      = self.teams.ix[:,:,'pts'];
@@ -500,9 +546,11 @@ class DraftSimulator:
         
         ''' Clean way of analyzing multiple drafts '''
         
-        DraftResultsDF  = DraftResultsPanel[0].copy()
+        DraftResultsDF  = DraftResultsPanel[4].copy()
         DraftResultsDF.pop('POS')
         DraftResultsDF.pop('RANK')
+        # DraftResultsDF.pop('TEAM')
+        #DraftResultsDF.pop('RND')
         DraftResultsDF.pop('ID')
         DraftResultsDF.pop('PTS')
         
@@ -512,6 +560,9 @@ class DraftSimulator:
         
         print DraftResultsDF
         
+        self.LOG.write(md.markdown('Player Pre-Rank Analysis:\n' + self.LONG_STR))
+        self.LOG.write(DraftResultsDF.to_html())
+        
         return(DraftResultsDF)
         
     def AnalyzeDraftResults(self, playersAnalysis, teamsAnalysis):
@@ -519,7 +570,7 @@ class DraftSimulator:
         GOOD_WIN_CHANCE         = 2 * 100 / self.numOfTeams;      # twice the average chance of winning
         MIN_RUNS_TO_PRINT       = self.DRAFTS_TO_RUN > 4;
         
-        playersAnalysis         = playersAnalysis[playersAnalysis.avg != 0];        # Remove undrafted players:
+        playersAnalysis         = playersAnalysis[playersAnalysis.avg != 0];        # Remove undrafted simPlayers:
         playersAnalysis         = playersAnalysis * 100 / self.DRAFTS_TO_RUN
         playersAnalysis['avg']  = playersAnalysis['avg'] / 100;
         
@@ -553,3 +604,9 @@ class DraftSimulator:
         
         print self.LONG_STR, 'Okay let us take a look at how everyone did:\n', self.LONG_STR
         print teamsAnalysis.sort(columns='rnk', ascending=True), '\n', self.LONG_STR; 
+
+        self.LOG.write(md.markdown('Draft Result by Team:\n' + self.LONG_STR))
+        self.LOG.write(teamsAnalysis.sort(columns='rnk', ascending=True).to_html())
+
+        self.LOG.write(md.markdown('Draft Result Evaluation:\n' + self.LONG_STR))
+        self.LOG.write(self.DraftResults.to_html())

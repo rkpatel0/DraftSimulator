@@ -2,75 +2,61 @@
 import numpy as np;
 import pandas as pd;
 import ffa.draft_simulator as draft;
-import ffa.create_players as players;
-import ffa.get_players as playersReal;
+import ffa.create_players as genPlayers;
+import ffa.get_players as getPlayers;
 import ffa.scratch_sheet as tmp;
 
 # -------------------------------------------------------
 # Generate Draft Information:
 # -------------------------------------------------------
 
-# 1. Draft Settings
+# 1.  League Settings
 #--------------------------------------------------------
 pColumns  = ['QB', 'RB', 'WR', 'TE']       
-nSpots    = [   1,    2,    2,    1]
-rSlope    = [  5,   20,    5,   20]
-rStart    = [ 400,  350,  325,  300]
+nSpots    = [   1,   2,     0,    1]
+rSlope    = [  35,   20,    5,   10]
+rStart    = [ 400,   400, 325,  300]
 pIndex    = ['spots', 'slope', 'start'];
 
-posArray    = np.reshape([nSpots,rSlope, rStart],(3,4));
-posFrame    = pd.DataFrame(posArray, columns=pColumns,index=pIndex);
+posArray  = np.reshape([nSpots,rSlope, rStart],(3,4));
+PosInfo   = pd.DataFrame(posArray, columns=pColumns,index=pIndex);
 
 # 2. Team Settings
 #--------------------------------------------------------
 tcol      =            [       'strategy'   , 'breakTie' ];  
-teamData  = np.reshape(['A'   ,  'breath'     , 'random'   ,\
-                        'B'   ,  'breath'     , 'random'   ,\
-                        'C'   ,  'breath'     , 'random'   ,\
-                        'D'   ,  'breath'     , 'random'   ,\
-                        'E'   ,  'breath'     , 'random'   ,\
-                        'F'   ,  'breath'     , 'random'   ,\
-                        'G'   ,  'breath'     , 'random'   ,\
-                        'H'   ,  'breath'     , 'random'   ,\
+teamData  = np.reshape(['A'   ,  'rank'     , 'random'   ,\
+                        'B'   ,  'rank'     , 'random'   ,\
+                        'C'   ,  'rank'     , 'random'   ,\
+                        'D'   ,  'breath'   , 'random'   ,\
+                        'E'   ,  'rank'     , 'random'   ,\
+                        'F'   ,  'rank'     , 'random'   ,\
+                        'G'   ,  'rank'     , 'random'   ,\
+                        'H'   ,  'rank'     , 'random'   ,\
                         ], (8,3))
 
-draftInfo   = pd.DataFrame(teamData[:,1:], index=teamData[:,0], columns=tcol)
+TeamInfo   = pd.DataFrame(teamData[:,1:], index=teamData[:,0], columns=tcol)
+
+oD         = draft.DraftSimulator(PosInfo, TeamInfo);
+oD.DRAFTS_TO_RUN    = 1
 
 # 3. Generate Player Class
 #--------------------------------------------------------
-oGp         = players.CreatePlayers(posFrame, len(draftInfo.index));
 
-oP          = playersReal.GetPlayers();
-players     = oP.GetSeasonStats(2011)
-players     = oP.CleanPlayersForDraftSim(players);
+USE_REAL_PLAYERS = True
+
+if USE_REAL_PLAYERS:
+    oGetP       = getPlayers.GetPlayers();
+    players     = oGetP.GetSeasonStats(2010)
+else:
+    oGenP       = genPlayers.CreatePlayers(PosInfo, len(TeamInfo.index));
+    players     = oGenP.GeneratePlayers()
 
 # 4. Run Drafts to Compare
 #--------------------------------------------------------
-DraftResultDict     = {}
 
-oD                  = draft.DraftSimulator(posFrame, draftInfo);
-oD.DRAFTS_TO_RUN    = 1
-
-# Set Initial Draft Ranks:
-players.sort(columns='rnk',ascending=True,inplace=True);
+oD.RunMultipleDrafts(players)
 #players.sort(columns='pts',ascending=False,inplace=True);
-
-playersAnalysis     = oD.RunMultipleDrafts(players);
-DraftResultDict[0]  = oD.DraftResults
-
-playersAnalysis     = oD.RunMultipleDrafts(players.reindex(oD.DraftResults.RANK));
-DraftResultDict[1]  = oD.DraftResults
-
-playersAnalysis     = oD.RunMultipleDrafts(players.reindex(oD.DraftResults.RANK));
-DraftResultDict[2]  = oD.DraftResults
-
-playersAnalysis     = oD.RunMultipleDrafts(players.reindex(oD.DraftResults.RANK));
-DraftResultDict[3]  = oD.DraftResults
-
-playersAnalysis     = oD.RunMultipleDrafts(players.reindex(oD.DraftResults.RANK));
-DraftResultDict[4]  = oD.DraftResults
-DraftResultDict[5]  = oD.DraftResults.sort(columns='RANK',ascending=True)
-
-oD.CompareDraftResults(pd.Panel(DraftResultDict))
+players = oD.GeneratePlayerDraftRanks(players)
+oD.RunMultipleDrafts(players.sort_index());
     
 print 'done!'

@@ -47,7 +47,6 @@ class CreatePlayers:
 
         self.SetInstanceVariables();
         self.CreatePlayerFrame();
-        self.GeneratePlayersByEquation();
         
     def SetInstanceVariables(self):
 
@@ -65,7 +64,7 @@ class CreatePlayers:
                               index=np.arange(self.numOfPlayers));
         self.players.index.name = 'idx'
         
-    def GeneratePlayersByEquation(self):
+    def GeneratePlayers(self):
         
         playerIdx   = 0;    # index for filling in each row of player frame
 
@@ -83,6 +82,8 @@ class CreatePlayers:
         # RANK BY POINTS: Below order is VERY IMPORTANT!!!
         self.players.sort(columns='pts',ascending=False,inplace=True);
         self.players['rnk']     = np.arange(self.players.pts.count()) +1
+        
+        return(self.players.copy())
         
     def GetPointsByPos(self, pos):
 

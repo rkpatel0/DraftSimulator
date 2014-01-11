@@ -9,52 +9,54 @@ import matplotlib.pyplot as plt;
 import os.path;
     
 def main():
-    oP          = GetPlayers();
-    oP.databaseDir    = r'../../../Database/Football/PlayerStatsByYearPFB'
-    players2    = oP.GetSeasonStats(2012)
-    playersNew  = oP.CleanPlayersForDraftSim(players2);
+    
+    ''' Use when module called directly '''
+    
+    oP         = GetPlayers();
+    players    = oP.GetSeasonStats(2012)
         
-    print 'Done Debug Marker'
+    print players
     
 class GetPlayers:
     
     def __init__(self):
-        self.SetInstanceVariables()
+        self.SetPlayerDefaults()
+        self.SetDatabaseMapping()
+        self.SetAnalysisConditions()
 
-    def SetInstanceVariables(self):
         
-        # Set Instance Variables
-        print "Creating Analysis Class...\n"
-        
-        # Analysis Variables
-        self.NumOfPlayers   = 30                    # Num of players to observe
-        self.MinQualifyPts  = 50                   # Threahold to qualify player
-        self.SaveFigureEn   = False                 # if = true > Save Plots
-        
-        self.MIN_PLAYERS_NEEDED     = 100
-        
+    def SetPlayerDefaults(self): 
+         
         # Fantasy Variables
-        self.ptsData        = {'PassYds' : [0.025],  # Make 0.04 (1 pt/25yards)?
-                               'PassTDs' : [5],     # = pts / TD
-                               'PassInt' : [-2],    # = pts / INT
-                               'RushYds' : [0.067],   # = pts / yard
-                               'RushTDs' : [5],     # = pts / TD
-                               'RecComp' : [0.25],   # = pts / comp
-                               'RecYds'  : [0.05],   # = pts / yard
-                               'RecTDs'  : [5]}     # = pts / TD
+        self.ptsData        = {'PassYds' : [0.025],     # Make 0.04 (1 pt/25yards)?
+                               'PassTDs' : [5],         # = pts / TD
+                               'PassInt' : [-2],        # = pts / INT
+                               'RushYds' : [0.067],     # = pts / yard
+                               'RushTDs' : [5],         # = pts / TD
+                               'RecComp' : [0.25],      # = pts / comp
+                               'RecYds'  : [0.05],      # = pts / yard
+                               'RecTDs'  : [5]}         # = pts / TD
         
-        self.FanPosition    = ['QB', 'RB', 'WR', 'TE']  # Used for classing players
+        self.FanPosition    = ['QB', 'RB', 'WR', 'TE']  # Used for classing simPlayers
+ 
+    def SetDatabaseMapping(self):
 
         # Database Dependent Variables
-        self.FileExt        = '_FantasyStats.csv'           # File Name Ext
-        #self.databaseDir    = r'C:\Users\rpatel\Dropbox\Database\Football\ProFootBallStats'
+        self.FileExt        = '_FantasyStats.csv'        # File Name Ext
         self.databaseDir    = r'../../Database/Football/PlayerStatsByYearPFB'
-        self.FigPath        = os.path.join(self.databaseDir,'Analysis\\')
         self.RemoveCol      = ['Rk', 'VBD']
         self.StandardCol    = ['Name', 'Team', 'Age', 'GP', 'GS', 'PassCmp', 'PassAtt', 
                                'PassYds', 'PassTDs', 'PassInt', 'RushAtt', 'RushYds', 
                                'RushAvg', 'RushTDs', 'RecComp', 'RecYds', 'RecAvg', 'RecTDs', 
                                'Position', 'FantTotalPts', 'FantPosRank', 'FantOvrRank']
+        
+    def SetAnalysisConditions(self):
+        
+        self.NumOfPlayers       = 30                    # Num of simPlayers to observe
+        self.MinQualifyPts      = 50                    # Threahold to qualify player
+        self.MIN_PLAYERS_REQ    = 50
+        self.SaveFigureEn       = False                 # if = true > Save Plots
+        self.FigPath            = os.path.join(self.databaseDir,'Analysis\\')
         
     def GetSeasonStats(self, year):
         
@@ -67,7 +69,9 @@ class GetPlayers:
         self.ComputeFantasyPoints()
         self.df.FileName = year             # TODO: Should move but breaks
         
-        return(self.df.copy());
+        players = self.CleanPlayersForDraftSim(self.df.copy())
+        
+        return(players);
     
     def CleanUpData(self):
         
@@ -97,16 +101,16 @@ class GetPlayers:
         self.df     = self.df.sort(columns='FantTotalPts',ascending=False) 
         self.df     = self.df.set_index(self.df.Name)
 
-    def CleanPlayersForDraftSim(self, players):
+    def CleanPlayersForDraftSim(self, simPlayers):
         
-        indexNew    = players.index;
+        indexNew    = simPlayers.index;
         columnsNew  = ['rnk', 'pts', 'pos', 'posRnk'];     # output format
         columnsOld  = ['FantOvrRank', 'FantTotalPts', 'Position', 'FantPosRank']
         playersNew  = pd.DataFrame(index=indexNew, columns=columnsNew)
 
         for i, col in enumerate(columnsNew):
             colOld              = columnsOld[i];
-            playersNew[col]     = players[colOld];
+            playersNew[col]     = simPlayers[colOld];
  
         playersNew.posRnk   = playersNew.pos + playersNew.posRnk.map(int).map(str);
         playersNew['id']    = playersNew.index.map(str)
@@ -114,25 +118,13 @@ class GetPlayers:
         playersNew.index    = playersNew.rnk;
         playersNew.index.name = 'idx'
         
-        if playersNew.rnk.count() < self.MIN_PLAYERS_NEEDED:
-            print 'WARNING: Critically low number of players = ', playersNew.rnk.count()
+        if playersNew.rnk.count() < self.MIN_PLAYERS_REQ:
+            print 'WARNING: Critically low number of simPlayers = ', playersNew.rnk.count()
         
         playersNew.sort(columns='rnk', ascending=True, inplace=True);
 
         return(playersNew)
         
-    def setUp(self):
-        pass
-
-
-    def tearDown(self):
-        pass
-
-
-    def testName(self):
-        pass
-
-
 if __name__ == "__main__":
     
     main();

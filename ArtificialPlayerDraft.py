@@ -2,8 +2,8 @@
 import numpy as np;
 import pandas as pd;
 import ffa.draft_simulator as draft;
-import ffa.create_players as players;
-import ffa.get_players as playersReal;
+import ffa.create_players as simPlayers;
+from ffa import get_players as playersReal
 import ffa.scratch_sheet as tmp;
 
 # -------------------------------------------------------
@@ -19,36 +19,36 @@ rStart    = [ 400,  350,  325,  300]
 pIndex    = ['spots', 'slope', 'start'];
 
 posArray    = np.reshape([nSpots,rSlope, rStart],(3,4));
-posFrame    = pd.DataFrame(posArray, columns=pColumns,index=pIndex);
+PosInfo    = pd.DataFrame(posArray, columns=pColumns,index=pIndex);
 
 # 2. Team Settings
 #--------------------------------------------------------
 tcol      =            [         'strategy'   , 'breakTie' ];  
-teamData  = np.reshape(['A'   ,  'breath'     , 'random'   ,\
-                        'B'   ,  'breath'     , 'random'   ,\
-                        'C'   ,  'breath'     , 'random'   ,\
-                        'D'   ,  'breath'     , 'random'   ,\
-                        'E'   ,  'breath'     , 'random'   ,\
-                        'F'   ,  'breath'     , 'random'   ,\
+teamData  = np.reshape(['AI'   ,  'rank'     , 'random'   ,\
+                        'Alpa' , 'rank'     , 'random'   ,\
+                        'C'   ,  'rank'     , 'random'   ,\
+                        'D'   ,  'rank'     , 'random'   ,\
+                        'E'   ,  'rank'     , 'random'   ,\
+                        'F'   ,  'rank'     , 'random'   ,\
                         'G'   ,  'breath'     , 'random'   ,\
-                        'H'   ,  'breath'     , 'random'   ,\
+                        'H'   ,  'rank'     , 'random'   ,\
                         ], (8,3))
 
-draftInfo   = pd.DataFrame(teamData[:,1:], index=teamData[:,0], columns=tcol)
+TeamInfo   = pd.DataFrame(teamData[:,1:], index=teamData[:,0], columns=tcol)
 
 # 3. Generate Player Class
 #--------------------------------------------------------
-oGp         = players.CreatePlayers(posFrame, len(draftInfo.index));
+oGp         = simPlayers.CreatePlayers(PosInfo, len(TeamInfo.index));
 
 oP          = playersReal.GetPlayers();
-players     = oP.GetSeasonStats(2012)
-players     = oP.CleanPlayersForDraftSim(players);
-players.sort(columns='pts',ascending=False,inplace=True);
+simPlayers     = oP.GetSeasonStats(2011)
+simPlayers     = oP.CleanPlayersForDraftSim(simPlayers);
+#simPlayers.sort(columns='pts',ascending=False,inplace=True);
 
 # 4. Kick-Off Draft
 #--------------------------------------------------------
-oD                  = draft.DraftSimulator(posFrame, draftInfo);
+oD                  = draft.DraftSimulator(PosInfo, TeamInfo);
 oD.DRAFTS_TO_RUN    = 1
-playersAnalysis     = oD.RunMultipleDrafts(players);
+playersAnalysis     = oD.RunMultipleDrafts(oGp.players);
 
 print 'done!'
